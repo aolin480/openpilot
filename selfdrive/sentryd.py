@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import http.client, urllib
 import numpy as np
 
 from cereal import messaging
@@ -36,6 +37,9 @@ signals = [
 
 class SentryMode:
   def __init__(self):
+    self.pushOverToken = ""
+    self.pushOverUserID = ""
+
     self.sm = messaging.SubMaster(['deviceState', 'sensorEvents'], poll=['sensorEvents'])
     self.pm = messaging.PubMaster(['sentryState'])
 
@@ -92,6 +96,16 @@ class SentryMode:
     self.update_sentry_tripped(now_ts)
     # self.sprint(f"{self.sentry_tripped=}")
 
+  def send_notification(self, now_ts):
+    conn = http.client.HTTPSConnection("api.pushover.net:443")
+    conn.request("POST", "/1/messages.json",
+      urllib.parse.urlencode({
+        "token": self.pushOverToken,
+        "user": self.pushOverUserID,
+        "message": "Sentry Tripped",
+      }), { "Content-type": "application/x-www-form-urlencoded" })
+    conn.getresponse()
+
   def is_sentry_armed(self, now_ts):
     """Returns if sentry is actively monitoring for movements/can be alarmed"""
     # Handle car interaction, reset interaction timeout
@@ -128,6 +142,10 @@ class SentryMode:
     # set when we first tripped
     if sentry_tripped and not self.sentry_tripped:
       self.sentry_tripped_ts = sec_since_boot()
+
+      # if self.pushOverToken and self.pushOverUserID:
+        # self.send_notification(now_ts)
+
     self.sentry_tripped = sentry_tripped
 
   def publish(self):
